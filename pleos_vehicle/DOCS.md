@@ -36,6 +36,7 @@ October 2026: the error code tables contain no 429 or quota error). So the add-o
 - counts every API call per endpoint per day (**Data & API** tab and the
   `API calls today` diagnostic sensor);
 - backs off exponentially on HTTP 429 or 5xx, and honours `Retry-After` when sent;
+- pauses all polling after an HTTP 403 (access denied): 15 minutes, doubling up to 6 hours;
 - polls endpoints that keep returning no data (for example the freezer on a car without
   one) only once an hour;
 - requests a new access token only when the API reports it as expired or invalid.

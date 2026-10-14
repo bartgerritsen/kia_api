@@ -238,7 +238,7 @@ class Storage:
             "INSERT INTO api_usage (day, endpoint, calls, errors, rate_limited) VALUES (?, ?, 1, ?, ?) "
             "ON CONFLICT (day, endpoint) DO UPDATE SET calls = calls + 1, errors = errors + excluded.errors, "
             "rate_limited = rate_limited + excluded.rate_limited",
-            (day, endpoint, 0 if ok else 1, 1 if http_status == 429 else 0),
+            (day, endpoint, 0 if ok else 1, 1 if http_status in (403, 429) else 0),
         )
 
     def usage(self, days: int = 14) -> list[dict[str, Any]]:

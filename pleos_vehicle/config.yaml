@@ -1,5 +1,5 @@
 name: Pleos Vehicle
-version: "0.1.1"
+version: "0.1.2"
 slug: pleos_vehicle
 description: Dashboard and MQTT sensors for Kia, Hyundai and Genesis cars via the Pleos Vehicle Data API
 url: https://github.com/bartgerritsen/kia_api

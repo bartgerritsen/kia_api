@@ -23,7 +23,7 @@ from .poller import Poller
 from .storage import Storage, iso_ago
 from .trips import telemetry
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")

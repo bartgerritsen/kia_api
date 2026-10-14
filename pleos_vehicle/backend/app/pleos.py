@@ -70,6 +70,10 @@ class PleosTransientError(PleosError):
         self.retry_after = retry_after
 
 
+class PleosForbidden(PleosTransientError):
+    """HTTP 403: Pleos refuses access (key without permission, consent withdrawn or blocked)."""
+
+
 UsageCallback = Callable[[str, bool, int], None]
 
 
@@ -148,7 +152,12 @@ class PleosClient:
             message = err.get("message", message)
             request_id = err.get("requestId")
         except Exception:
-            pass
+            # Not JSON (e.g. a gateway or firewall page): keep the start of the body for diagnostics
+            text = " ".join(resp.text.split())[:200]
+            if text:
+                message = f"{message}: {text}"
+        if resp.status_code == 403 or code == "403":
+            return PleosForbidden(resp.status_code, code, message, request_id)
         if resp.status_code == 429 or resp.status_code >= 500:
             retry_after = resp.headers.get("Retry-After")
             return PleosTransientError(

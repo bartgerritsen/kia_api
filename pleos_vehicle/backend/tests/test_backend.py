@@ -270,3 +270,48 @@ def test_history_error_is_recorded_and_backfill_retried(poller):
     row = poller.storage.latest(mock.VIN)["driving_data"]
     assert row["error_code"] == "4002" and "Invalid Request Parameters" in row["error_message"]
     assert poller.storage.get_meta(f"backfill_v2:{mock.VIN}") is None  # will retry next sync
+
+
+def test_forbidden_pauses_all_polling(poller):
+    """A 403 must stop the cycle immediately and back off for a long time, not retry every endpoint."""
+    import time
+
+    from app.pleos import PleosForbidden
+
+    calls = []
+
+    def blocked(request):
+        if request.url.path == "/v1/auth/personal-token":
+            return mock.handler(request)
+        calls.append(request.url.path)
+        if request.url.path == "/v1/vehicles/consent":
+            return mock.handler(request)
+        return httpx.Response(403, json={"error": {"code": "403", "message": "Forbidden"}})
+
+    poller.client._http._transport = httpx.MockTransport(blocked)
+
+    async def scenario():
+        await poller._refresh_vehicles()
+        await poller.poll_vehicle(poller.vehicles[0])
+
+    with pytest.raises(PleosForbidden) as exc:
+        run(scenario())
+    assert sum(1 for c in calls if c != "/v1/vehicles/consent") == 1  # stopped after the first refused call
+
+    poller._on_failure(exc.value)
+    assert poller.backoff_until - time.time() >= 890
+    assert "Access denied" in poller.last_error and poller.api_ok is False
+    assert sum(r["rate_limited"] for r in poller.storage.usage(1)) == 1
+
+
+def test_forbidden_html_body_is_kept():
+    from app.pleos import PleosForbidden
+
+    def handler(req):
+        if req.url.path == "/v1/auth/personal-token":
+            return httpx.Response(200, json={"data": {"accessToken": "t"}})
+        return httpx.Response(403, text="<html><body>Request blocked by WAF</body></html>")
+
+    with pytest.raises(PleosForbidden) as exc:
+        run(_client(handler).get_status("VIN", "batteries"))
+    assert "Request blocked by WAF" in exc.value.message

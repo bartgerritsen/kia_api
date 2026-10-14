@@ -28,6 +28,7 @@ from .pleos import (
     PleosAuthError,
     PleosClient,
     PleosError,
+    PleosForbidden,
     PleosNoData,
     PleosTransientError,
 )
@@ -40,6 +41,8 @@ NO_DATA_RETRY_S = 3600
 NO_DATA_STREAK = 3
 AUTH_RETRY_S = 900
 MAX_BACKOFF_S = 1800
+FORBIDDEN_BACKOFF_S = 900  # first pause after a 403, doubling up to FORBIDDEN_MAX_BACKOFF_S
+FORBIDDEN_MAX_BACKOFF_S = 6 * 3600
 VEHICLE_REFRESH_S = 6 * 3600
 BACKFILL_ATTEMPTS = 3
 
@@ -129,6 +132,15 @@ class Poller:
         if isinstance(exc, PleosAuthError):
             delay = AUTH_RETRY_S
             self.last_error = f"Credentials rejected ({exc.code}: {exc.message}). Check client_id/client_secret or reissue the key."
+        elif isinstance(exc, PleosForbidden):
+            # Stop hammering: a 403 may mean the key is blocked, possibly for call volume
+            self.backoff_level += 1
+            delay = min(FORBIDDEN_BACKOFF_S * 2 ** (self.backoff_level - 1), FORBIDDEN_MAX_BACKOFF_S)
+            self.last_error = (
+                f"Access denied by Pleos ({exc.http_status} {exc.code}: {exc.message}). "
+                f"All polling paused for {int(delay // 60)} min. If this keeps happening, check the key status "
+                f"in Pleos Playground and raise poll_interval."
+            )
         else:
             self.backoff_level += 1
             delay = exc.retry_after if isinstance(exc, PleosTransientError) and exc.retry_after else min(

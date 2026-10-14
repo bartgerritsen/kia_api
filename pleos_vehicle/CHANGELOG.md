@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- HTTP 403 from Pleos now pauses all polling (15 min, doubling up to 6 h) instead of retrying every endpoint each minute, and is shown as an error. 403s are counted with 429s on the Data & API page.
+
 ## 0.1.1
 
 - Map: tile.openstreetmap.org blocked tiles because the Ingress panel sends no Referer; tiles now send the page origin. Optional `map_tile_url` / `map_tile_attribution` options for another tile server. Dark mode darkens the map.
