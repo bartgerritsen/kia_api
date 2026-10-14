@@ -176,6 +176,7 @@ const en = {
   "data.rateNote":
     "Pleos does not publish rate limits. This page counts every call so you can see what the add-on uses. Any HTTP 429 shows up here, and the add-on backs off automatically.",
   "data.version": "Version",
+  "data.diagnostics": "Download diagnostics",
 } as const;
 
 export type Key = keyof typeof en;
@@ -354,6 +355,7 @@ const nl: Record<Key, string> = {
   "data.rateNote":
     "Pleos publiceert geen rate limits. Deze pagina telt elke call, zodat je ziet wat de add-on gebruikt. Een HTTP 429 verschijnt hier en de add-on wacht dan automatisch.",
   "data.version": "Versie",
+  "data.diagnostics": "Diagnose downloaden",
 };
 
 const dictionaries: Record<Lang, Record<Key, string>> = { en, nl };

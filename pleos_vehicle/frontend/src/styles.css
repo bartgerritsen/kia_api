@@ -558,3 +558,8 @@ pre.json {
   background: var(--surface-2);
   font: inherit;
 }
+
+/* OSM has no dark style: invert the tiles (not the markers) in dark mode */
+.map.dark-tiles .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+}

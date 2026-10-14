@@ -30,6 +30,8 @@ class Settings:
     mqtt_port: int | None = None
     mqtt_username: str | None = None
     mqtt_password: str | None = None
+    map_tile_url: str | None = None
+    map_tile_attribution: str | None = None
     api_base: str = "https://api.pleos.ai"
     data_dir: str = "/data"
     timezone: str = "UTC"

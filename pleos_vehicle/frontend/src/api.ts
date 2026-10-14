@@ -50,6 +50,8 @@ export interface Info {
   timezone: string;
   mock: boolean;
   mqtt: string;
+  map_tile_url?: string | null;
+  map_tile_attribution?: string | null;
   poller: PollerStatus;
 }
 

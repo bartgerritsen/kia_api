@@ -176,7 +176,7 @@ def test_poll_and_history_cycle(poller):
     assert touched >= 10  # two trips per day over a 7-day backfill
     trips = poller.storage.trips(vin, "2000-01-01")
     assert trips[0]["distance_km"] > 0
-    assert poller.storage.get_meta(f"backfill:{vin}")
+    assert poller.storage.get_meta(f"backfill_v2:{vin}")
 
 
 def test_charging_sessions(tmp_path):
@@ -225,3 +225,48 @@ def test_mqtt_discovery_only_announces_known_values(tmp_path):
     state_payload = json.loads(topics["pleos/KNA1/state"])
     assert state_payload["battery_soc"] == state["battery_soc"]
     assert json.loads(topics["pleos/KNA1/location"])["latitude"] == state["latitude"]
+
+
+def test_history_falls_back_to_single_days(poller):
+    """When the API rejects a multi-day range, each day is requested separately."""
+    real_handler = mock.handler
+    ranges = []
+
+    def strict(request):
+        params = request.url.params
+        if "startDate" in params:
+            ranges.append((params["startDate"], params["endDate"]))
+            if params["startDate"] != params["endDate"]:
+                return httpx.Response(400, json={"error": {"code": "4002", "message": "Invalid Request Parameters"}})
+        return real_handler(request)
+
+    poller.client._http._transport = httpx.MockTransport(strict)
+
+    async def scenario():
+        await poller._refresh_vehicles()
+        return await poller.sync_history(mock.VIN)
+
+    touched = run(scenario())
+    assert touched >= 10
+    assert sum(1 for s, e in ranges if s == e) == 4 * 7  # per-day retry for every endpoint
+    status = poller.storage.latest(mock.VIN)["speed"]
+    assert status["error_code"] is None and status["payload"]["trips_returned"] >= 10
+    assert poller.storage.get_meta(f"backfill_v2:{mock.VIN}")
+
+
+def test_history_error_is_recorded_and_backfill_retried(poller):
+    def broken(request):
+        if "startDate" in request.url.params:
+            return httpx.Response(400, json={"error": {"code": "4002", "message": "Invalid Request Parameters"}})
+        return mock.handler(request)
+
+    poller.client._http._transport = httpx.MockTransport(broken)
+
+    async def scenario():
+        await poller._refresh_vehicles()
+        await poller.sync_history(mock.VIN)
+
+    run(scenario())
+    row = poller.storage.latest(mock.VIN)["driving_data"]
+    assert row["error_code"] == "4002" and "Invalid Request Parameters" in row["error_message"]
+    assert poller.storage.get_meta(f"backfill_v2:{mock.VIN}") is None  # will retry next sync

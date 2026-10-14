@@ -79,8 +79,10 @@ export function DataPage({ vin, info, endpoints }: { vin: string | null; info: I
                 {Object.entries(endpoints).map(([key, e]) => (
                   <tr key={key}>
                     <td>{key}</td>
-                    <td>{fmtAgo(e.vehicle_ts, lang)}</td>
-                    <td className="small">{e.error_code ? `${e.error_code} · ${fmtAgo(e.error_at, lang)}` : "–"}</td>
+                    <td>{e.vehicle_ts ? fmtAgo(e.vehicle_ts, lang) : e.fetched_at ? `${t("data.fetched")} ${fmtAgo(e.fetched_at, lang)}` : "–"}</td>
+                    <td className="small" style={{ whiteSpace: "normal" }}>
+                      {e.error_code ? `${e.error_code}: ${e.error_message ?? ""} · ${fmtAgo(e.error_at, lang)}` : "–"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -153,6 +155,10 @@ export function DataPage({ vin, info, endpoints }: { vin: string | null; info: I
           <span className="small muted">
             {t("data.fetched")}: {fmtDateTime(raw?.[rawKey]?.fetched_at, lang)}
           </span>
+          <span className="spacer" />
+          <a className="btn" href="api/diagnostics" download="pleos-diagnostics.json" style={{ textDecoration: "none" }}>
+            {t("data.diagnostics")}
+          </a>
         </div>
         <pre className="json">{JSON.stringify(raw?.[rawKey]?.payload ?? raw?.[rawKey] ?? null, null, 2)}</pre>
       </div>

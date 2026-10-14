@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Info, type Vehicle } from "./api";
+import { DEFAULT_TILES, TileContext } from "./components/MapView";
 import { I18nProvider, useI18n, type Lang } from "./i18n";
 import { Charging } from "./pages/Charging";
 import { DataPage } from "./pages/DataPage";
@@ -19,6 +20,10 @@ export default function App() {
     if (info && !readStored("pleos.lang")) setLang(info.language);
   }, [info]);
 
+  const tiles = info?.map_tile_url
+    ? { url: info.map_tile_url, attribution: info.map_tile_attribution ?? "" }
+    : DEFAULT_TILES;
+
   const changeLang = (l: Lang) => {
     setLang(l);
     writeStored("pleos.lang", l);
@@ -26,7 +31,9 @@ export default function App() {
 
   return (
     <I18nProvider lang={lang}>
-      <Shell info={info} lang={lang} setLang={changeLang} />
+      <TileContext.Provider value={tiles}>
+        <Shell info={info} lang={lang} setLang={changeLang} />
+      </TileContext.Provider>
     </I18nProvider>
   );
 }

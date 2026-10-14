@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import mock
@@ -23,7 +23,7 @@ from .poller import Poller
 from .storage import Storage, iso_ago
 from .trips import telemetry
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
@@ -79,6 +79,8 @@ def info():
         "timezone": settings.timezone,
         "mock": settings.mock,
         "mqtt": mqtt.status,
+        "map_tile_url": settings.map_tile_url,
+        "map_tile_attribution": settings.map_tile_attribution,
         "poller": poller.status(),
     }
 
@@ -137,6 +139,19 @@ def vehicle_charging(vin: str, days: int = 30):
 @app.get("/api/usage")
 def usage(days: int = 14):
     return {"days": storage.usage(days), "poller": poller.status()}
+
+
+@app.get("/api/diagnostics")
+def diagnostics():
+    """Everything needed to debug field mapping: raw payloads, normalised state, errors and usage."""
+    body = {
+        "info": info(),
+        "vehicles": [
+            {**v, "raw": storage.latest(v["vin"]), "state": poller.vehicle_state(v["vin"])} for v in poller.vehicles
+        ],
+        "usage": storage.usage(3),
+    }
+    return JSONResponse(body, headers={"Content-Disposition": 'attachment; filename="pleos-diagnostics.json"'})
 
 
 @app.post("/api/refresh")

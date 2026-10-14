@@ -26,6 +26,7 @@ MQTT entities you can use in automations.
 | `mqtt_enabled` | `true` | Publish MQTT discovery entities. |
 | `mqtt_discovery_prefix` | `homeassistant` | Only change if you changed it in the MQTT integration. |
 | `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password` | | Optional: use an external broker instead of the Mosquitto add-on. |
+| `map_tile_url`, `map_tile_attribution` | | Optional: another map tile server, e.g. `https://tile.thunderforest.com/atlas/{z}/{x}/{y}.png?apikey=...`. Default is OpenStreetMap. |
 
 ## Rate limits
 
@@ -76,6 +77,7 @@ a value for it.
 - Europe only (Pleos restriction).
 - Vehicles added to your Kia account after the key was issued are not visible:
   revoke and reissue the key in Pleos Playground.
+- Map tiles are loaded from OpenStreetMap unless you set `map_tile_url`.
 - Trip routes come from the add-on's own location polls, so trips from before the
   add-on was running have charts but no map.
 - Charging sessions are only detected while the add-on is running.

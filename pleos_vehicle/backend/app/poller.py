@@ -41,6 +41,7 @@ NO_DATA_STREAK = 3
 AUTH_RETRY_S = 900
 MAX_BACKOFF_S = 1800
 VEHICLE_REFRESH_S = 6 * 3600
+BACKFILL_ATTEMPTS = 3
 
 
 def has_values(obj: Any) -> bool:
@@ -254,19 +255,23 @@ class Poller:
         """Fetch recent trips for one vehicle. Returns the number of trips touched."""
         zone = self._zone()
         today = datetime.now(zone).date()
-        backfilled = self.storage.get_meta(f"backfill:{vin}") is not None
+        backfilled = self.storage.get_meta(f"backfill_v2:{vin}") is not None
         days = self.settings.history_backfill_days if not backfilled else 2
         start: date = today - timedelta(days=max(1, min(days, 7)) - 1)
 
         touched: set[str] = set()
+        failed = False
         for kind in HISTORY_ENDPOINTS:
             try:
-                trips = await self.client.get_history(vin, kind, start, today, self.settings.timezone)
+                trips = await self._fetch_history(vin, kind, start, today)
             except (PleosAuthError, PleosTransientError):
                 raise
             except PleosError as exc:
+                failed = True
                 log.warning("History %s for %s failed: %s", kind, vin, exc)
+                self.storage.save_history_status(vin, kind, f"{start}..{today}", None, exc.code, exc.message)
                 continue
+            self.storage.save_history_status(vin, kind, f"{start}..{today}", len(trips))
             for trip in trips:
                 start_time = trip.get("triggerStartTime")
                 if not start_time:
@@ -278,6 +283,35 @@ class Poller:
             length_ms, parts = self.storage.trip_parts(vin, start_time)
             self.storage.set_trip_summary(vin, start_time, summarize(start_time, length_ms, parts))
         if not backfilled:
-            self.storage.set_meta(f"backfill:{vin}", datetime.now(timezone.utc).isoformat())
+            # Retry a failed backfill on the next syncs, but give up after a few attempts
+            attempts = int(self.storage.get_meta(f"backfill_v2_attempts:{vin}") or 0) + 1
+            self.storage.set_meta(f"backfill_v2_attempts:{vin}", str(attempts))
+            if not failed or attempts >= BACKFILL_ATTEMPTS:
+                self.storage.set_meta(f"backfill_v2:{vin}", datetime.now(timezone.utc).isoformat())
         log.info("Synced %d trip(s) for %s since %s", len(touched), vin, start)
         return len(touched)
+
+    async def _fetch_history(self, vin: str, kind: str, start: date, end: date) -> list[dict[str, Any]]:
+        """Fetch a date range; if the API rejects the range, fall back to one request per day."""
+        try:
+            return await self.client.get_history(vin, kind, start, end, self.settings.timezone)
+        except (PleosAuthError, PleosTransientError):
+            raise
+        except PleosError as exc:
+            if start == end:
+                raise
+            log.info("History %s %s..%s rejected (%s), retrying per day", kind, start, end, exc)
+        trips: list[dict[str, Any]] = []
+        errors: list[PleosError] = []
+        day = start
+        while day <= end:
+            try:
+                trips += await self.client.get_history(vin, kind, day, day, self.settings.timezone)
+            except (PleosAuthError, PleosTransientError):
+                raise
+            except PleosError as exc:
+                errors.append(exc)
+            day += timedelta(days=1)
+        if errors and len(errors) == (end - start).days + 1:
+            raise errors[-1]
+        return trips

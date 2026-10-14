@@ -119,6 +119,20 @@ class Storage:
             (vin, endpoint, code, message, utcnow()),
         )
 
+    def save_history_status(
+        self, vin: str, kind: str, date_range: str, trips: int | None, code: str | None = None, message: str | None = None
+    ) -> None:
+        """Record the outcome of a history request so it shows on the Data & API page."""
+        now = utcnow()
+        if code is None:
+            self._exec(
+                "INSERT OR REPLACE INTO latest (vin, endpoint, fetched_at, vehicle_ts, payload, error_code, error_message, error_at) "
+                "VALUES (?, ?, ?, NULL, ?, NULL, NULL, NULL)",
+                (vin, kind, now, json.dumps({"range": date_range, "trips_returned": trips})),
+            )
+        else:
+            self.save_error(vin, kind, code, f"{message} ({date_range})")
+
     def latest(self, vin: str) -> dict[str, dict[str, Any]]:
         rows = self._all("SELECT * FROM latest WHERE vin = ?", (vin,))
         out = {}
