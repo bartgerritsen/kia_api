@@ -1,0 +1,11 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.db
+*.db-*
+/dev-data/
+/pleos_vehicle/backend/static/
+*.tsbuildinfo
